@@ -14,57 +14,102 @@ Some of these activities may take a long time (if ever) to complete,  for instan
 Obviously to be useful, we have to write some functions for the menu actions.  In a real world program these have to be defined first because we cant use them until they are defined. As an introduction however we will start with defining a menu as this is the part that is new.
 
 
-## Defining a Menu
+## Menu and Submenus
 
+Menus are define as a list of menu-items.
+A menu item is defined as a pair of values:
+
+	1.  A Caption  (string)
+	2. An action function (a python function with NO parameters)
+	
+A menu is defined as list of menu item pairs.
 
   ```python
-  trees     = wrap( [('gum',data),('tea-tree',data),('red-gum count',data),('willow',data),('Back!',back)])
 
-patterns  = wrap( [('Chaser',yellow),('Red',red),('Blue',ablue),('Rainbow',rainbow),('Back!',back)])
+trees     = wrap_menu( [('gum',data),('tea-tree',data),('red-gum count',data),('willow',data),('Back!',back)])
 
-main_menu = wrap( [('Patterns',patterns),('trees',trees),('Brightness',brightness)])
+patterns  = wrap_menu( [('Chaser',yellow),('Red',red),('Blue',ablue),('Rainbow',rainbow),('Back!',back)])
+
+main_menu = wrap_menu( [('Patterns',patterns),('trees',trees),('Brightness',brightness)])
+
 ```
 
-### Menus and submenus
-
 Here we have defined three menus, 'trees', 'patterns' and 'main_menu'.
-We define a menu from list of values.  Each individual value corresponds to a menuitem and is a tuple of ('caption',function).  Note that the caption needs quotes, but the function does not.
+Note that the caption needs quotes (because it is a string), but the function does not (because it is just the name of a function.
 
-The menu is actually a function so to turn our list into a function we pass it to another function called 'wrap_menu'.  Since our menu is itself a function,  it can be the function that is called from another menu.  This way we can get sub-menus.
+To turn our list into a function we pass it to another function called 'wrap_menu'.  Since our menu is itself a function,  it can be the function that is called from another menu.  This way we can get sub-menus.
 
-### Other uses for the menu
-Several  ways to  use menu functions have been defined.  You can develop your own using these as examples.
+Note that since the main_menu with the caption "Patterns" calls the menu function patterns, we must define patterns before we define the main_menu.
 
-#### Wizard and get_integer
-In small microprocessor systems we often want to enter a series of numbers like hours, minutes and seconds to set a clock.  The wizard calls a series of functions in sequence.  We define  a wizard  similarly to a menu.
 
-timewizard = wizard([("Hours",sethours),("Minutes",setminutes),("Seconds",setseconds)])
+### Functions to get information
+Three functions to get information are pre-defined:
+1. get_integer
+2. get_selection
+3. wizard
 
-sethours   = get_integer(low_v=1,high_v=24,increment=1,caption='Hours',field='hour')
+#### get_integer
+This allows to set a number by twiddling the shaft of the encoder.  The number is entered by click and is stored in a global dictionary called data.
+The key is set by the field parameter.
 
-sethours is a another function called  gets_integer with some parameters that (define as defaults parameters) for a caption, maximum value, minimum value. Increment which tells get_integer how much to change the value on each click of the encoder.
+``` python
+sethours   = get_integer(field = 'hour', low_v=1,high_v=24,increment=1,caption='Hours',field='hour')
+```
 
-This wizard will gather hours, minutes and seconds in that order,   then return.
+Later the value can be retrieved as below:
 
-### Selection
+``` python
 
-The selection function lets us get a string value from a list of values.
+if data['hour'] = 10:
+	pass
+	#Then do something
+
+```
+
+#### get_selection
+
+The selection function lets us get a string value from a list of values. The list is similar to a menu's list.  There is also a field parameter.
 
 ```python 
 colour1 = selection('colour1',['RED',('Green','GREEN'),('Blue','BLUE'),('Yellow','YELLOW'),('WHITE','white')])
 ```
 
-As we turn the shaft the name of the various colours is displayed.  When we click the shaft the current value is returned.  The name displayed is the first value in the tuple and the value returned is the second element of the tuple.  There is an option to just provide a string (say "RED").  In this case the string value is exanded to a tuple ('RED','RED') behind the scenes.
+As we turn the shaft the name of the various colours is displayed.  
+When we click the shaft the current value is returned.  
+The name displayed is the first value in the tuple and the value returned is the second element of the tuple.  
+There is an option to just provide a string (say "RED"). 
+In this case the string value is exanded to a tuple ('RED','RED') behind the scenes.
+
+```python 
+colour1 = selection('colour1',['RED',('Green','GREEN'),('Blue','BLUE'),('Yellow','YELLOW'),('WHITE','white')])
+
+#color1 is the field parameter
+```
+
+#### Wizard and get_integer
+In small microprocessor systems we often want to enter a series of numbers like hours, minutes and seconds to set a clock.  
+The wizard calls a series of functions in sequence.  We define  a wizard  similarly to a menu.
+
+timewizard = wizard([("Hours",sethours),("Minutes",setminutes),("Seconds",setseconds)])
+
+This wizard will gather hours, minutes and seconds in that order,   then return.
+
+sethours is a another function called  gets_integer with some parameters that (define as defaults parameters) for a caption, maximum value, minimum value. Increment  tells get_integer how much to expand the value on each click of the encoder.  
+For instance if we set a percentage, 100 clicks is pretty tedious. 
+We can set the encoder to return values between 0 and 10 and then expand the value by 10 by increment so we can get from 0 to 100 with 10 clicks.   
 
 ## How to get data out of the system.
 
-Data is returned by the functions get_integer and selection.  Each of these functions has a parameter called field.  There is a global dictionary in the  encodermenu module called data and values are stored in this dictionary.  It is up to you what you want do do with the values.
+Data is returned by the functions get_integer and selection.  
+Each of these functions has a parameter called field.  
+There is a global dictionary in the  encodermenu module called data and values are stored in this dictionary. 
+It is up to you what you want do do with the values.
 
 For instance in the selection above the field name is 'colour1'.  If we clicked on the screen while  it was showing 'RED' the dictionary would contain the folllowing
 encodermenu.data['colour1'] = 'RED'
 
 ### How to set default values
-We set default values by setting the encodermenu.data before we run mainloop.  get_integer and selection  read the data dictionary, both when they are created and when they are revisited through the menu system to get the intial value.   The  current value in data is displayed, and  then can  be altered by scrolling.
+We can set default values by setting the encodermenu.data before we run mainloop.  get_integer and selection  read the data dictionary, both when they are created and when they are revisited through the menu system to get the intial value.   The  current value in data is displayed, and  then can  be altered by scrolling.
 
 If you do not provide a default value get_integer will default to zero (0) and selection will default to 'dummy'
   
