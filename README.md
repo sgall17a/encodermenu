@@ -122,62 +122,44 @@ showtime = info(my_gettime_function)
 # don't use brackets on the function
 ```
 
- ##  Writing functions to actually do stuff.
-There several options.
-  1. Just write a function. 
+ ##  Writing action functions.
+ 
+There are several considerations so we will need to come back to this topic later.
+At this stage you can just write a function as long as it is quick.
  
   ```python
   def  showblueneopixels():
       for a in range(smallnumber):
          do_something()
   ```
-This will work  as a menu function.  The menu will be unchanged, which is usually fine, especially if your function is quick. However if the function takes a long time to run it will block. In other words the menu system will not work until the function finishes.
-	
-2. Write an async function.
-  ``` python
-async def  showblueneopixels():
-	for a in range(smallnumber):
-		do_something()
-		await asyncio.sleep(0)
-		```
-	To turn an ordinary function into an async function put async before def  then sprinkle some await asyncio.sleep(0) statements to make it play nice with others.  
-	
-	If you want more intelligent instruction than this there are plenty of tutorials to google.  Peter Hinchs tutorial is very good but does get moderately advanced.
-	
-	This function will work with the menu system but will likely prevent you from running other functions.  To get around this we need to make a task.
-	
-3. Write an async task.
-  ``` python 
-  def my_task_function()
-      stop()
- 	    make_task(show_blue_pixels)
- 	```
-# ddd    
- The menu encoder module provides two utility functions for tasks.  The first one is stop(). This cancels  other running tasks (say a continually running rainbow on neopixels) and allows you start another one.  make_task makes a global task called task.  Stop stops that global task.  This allows you to run one long running function after another.
- 
-4. Running several long running functinons simultaneously. 
-This can be done but is beyond the scope of this tutorial. Basically you give each function its own task.  If necessary,  then work out some way to stop them.  I would recommend Peters tutorial at this point.
-
-5. Write a function that does something on the screen.  
-There are a few possibilities.
-	a. Quick function.  Just display something on the screen.  It will stay there until you scroll or click. 
-	b.  One work around for a volatile display would be to adjust your display function so that is does not alter the bottom line of your display on scroll or click allowing a message to persist.
-	c. Slow or async function.  Write something to the display from time to time.
-	
-# How it works
-
-  
-	
-	
-	
+This will work  as a menu function.  The menu will be unchanged, which is usually fine, especially if your function is quick. 
+However, if the function takes a long time to run it will block and the menu system will freeze.
+We can get around blocking by writing an async function.  More on this later.
 
 
 
+# How it works - some implementation details.
 
+The system runs a bit like a gui.
+There is a event loop that polls the switch and the encoder. 
+If the switch is pressed or the value of the encoder changes then an on_click or on_scroll event is called.
+Events are handled by an object, which can be a Menu, GetInteger, Selection, Info Wizard and so on.
+The object handling the events is a global  called current.
+We change menus and entry screens etc by changing the current object.
+The main loop runs as an asyncio task so it does not block.
+Any function called within the menu system is also running within the asyncio loop so it can be a task or routine.
+A convenience function call make_task is provided which store the task in a global variable called task.
+A second convenience function called stop can stop the running task.
+(Note: This simple system with only handle one task. You can run more task but you will have to manange them himself).
 
+When we click a menuitem with one of the predefined objects like Menu, GetInteger, Selection etc the object is putt on a stack.
+There is a special function called back which pops the object off the stack so we can go back to where we came from.
+Actually we could handle with another event called back.  You could provide this, if you want,  by polling for another switch.
+I found that just having a back functions is quite intuitive and it is simple.
 
-
-
+### Various issues
+1. Be careful to define submenus before main parent menus.  If not you will get varibale not defined errors.
+2. 
 
 
 
@@ -230,7 +212,39 @@ asyncio.run(H.mainloop())# Run our encoder and switch loop asynchonously
 #Usually the program above will be in an endless loop.
 print('finished - probably wont get here')
 ```
+	
+2. Write an async function.
+  ``` python
+async def  showblueneopixels():
+	for a in range(smallnumber):
+		do_something()
+		await asyncio.sleep(0)
+  ```
 
+To turn an ordinary function into an async function put async before def  then sprinkle some await asyncio.sleep(0) statements to make it play nice with others.  
+	
+If you want more intelligent instruction than this there are plenty of tutorials to google.  Peter Hinchs tutorial is very good but does get moderately advanced.
+	
+This function will work with the menu system but will likely prevent you from running other functions.  To get around this we need to make a task.
+	
+3. Write an async task.
+  ``` python 
+  def my_task_function()
+      stop()
+ 	    make_task(show_blue_pixels)
+ ```
+# ddd    
+ The menu encoder module provides two utility functions for tasks.  The first one is stop(). This cancels  other running tasks (say a continually running rainbow on neopixels) and allows you start another one.  make_task makes a global task called task.  Stop stops that global task.  This allows you to run one long running function after another.
+ 
+4. Running several long running functinons simultaneously. 
+This can be done but is beyond the scope of this tutorial. Basically you give each function its own task.  If necessary,  then work out some way to stop them.  I would recommend Peters tutorial at this point.
+
+5. Write a function that does something on the screen.  
+There are a few possibilities.
+	a. Quick function.  Just display something on the screen.  It will stay there until you scroll or click. 
+	b.  One work around for a volatile display would be to adjust your display function so that is does not alter the bottom line of your display on scroll or click allowing a message to persist.
+	c. Slow or async function.  Write something to the display from time to time.
+	
 
 
 ### How to write  actions - by example
