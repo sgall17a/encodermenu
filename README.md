@@ -1,28 +1,23 @@
 # Micropython encoder based menu
 
 
-This simple menu system  was developed  for  micropython,  a rotary encoder and a little 128 * 64 pixel OLED display.  It was developed  on a Raspberry Pi Pico but also runs on an ESP32 and ESP8266.
+This simple menu system is written in micropython and uses a switch,  a rotary encoder and an OLED display.  It was developed  on a Raspberry Pi Pico but also runs on an ESP32 and ESP8266.
 
-I used a little OLED but it could  adapted to other displays using micropython's framebuffer or even  a very basic one line  liquid crystal display.  
+The prototype used a little 128 * 64 pixel SSD1306 based OLED.  It could an be  adapted to other displays using micropython's framebuffer or even  a very basic like a one line display like a liquid crystal display.  The switch used was just the switch on the shaft of the encoder.=
 
-There is a root menu from which there can be any number of submenus. Each menuitem is associated with a simple python function which takes no parameters.  (If we want to supply parameters we can use default values or closures)
+Initially there is the root menu shows a number of menu items.   Each menuitem is associated with a python function which takes no parameters.  If we want to supply parameters we have to use default values or closures. The menu-item's function can branch to a new menu, get data from the user or perform functions  suchas  flashing neopixels, or setting a clock.  By branching from  menu items there can be any number of submenus.
 
-The menu-item's function can do useful things like flashing neopixels, or setting a clock.
-
-Some of these activities may take a long time (if ever) to complete,  for instance neopixels flashing forever.  The system is  multitasking (using uasyncio)  so we can still run the menu itself,   at the same time as we are doing other activities..
-
-Obviously to be useful, we have to write some functions for the menu actions.  In a real world program these have to be defined first because we cant use them until they are defined. As an introduction however we will start with defining a menu as this is the part that is new.
+Some  activities may take a long time (if ever) to complete,  for instance flashing neopixels  in an endless loop.  In order to remain responsive the system  uses  multitasking with uasyncio.   In this way we can run the menu itself while  at the same time doing other activities..
 
 
 ## Menu and Submenus
 
-Menus are define as a list of menu-items.
+Menus are defined as a list of menu-items.
 A menu item is defined as a pair of values:
 
 	1.  A Caption  (string)
 	2. An action function (a python function with NO parameters)
-	
-A menu is defined as list of menu item pairs.
+
 
   ```python
 
@@ -35,12 +30,11 @@ main_menu = wrap_menu( [('Patterns',patterns),('trees',trees),('Brightness',brig
 ```
 
 Here we have defined three menus, 'trees', 'patterns' and 'main_menu'.
-Note that the caption needs quotes (because it is a string), but the function does not (because it is just the name of a function.
+Note that the caption needs quotes (because it is a string), but the function does not because it is just the name of a function.
 
-To turn our list into a function we pass it to another function called 'wrap_menu'.  Since our menu is itself a function,  it can be the function that is called from another menu.  This way we can get sub-menus.
+To transform our list into a function we pass it to another function called 'wrap_menu'.  Since our menu becomes a function,  it can be the function that is called from a menuitem.  In this way we can get sub-menus.
 
-Note that since the main_menu with the caption "Patterns" calls the menu function patterns, we must define patterns before we define the main_menu.
-
+Menu function must be defined before they are used, thus the root menu should be the last to be defined.
 
 ### Functions to get information
 Three functions to get information are pre-defined:
@@ -49,8 +43,7 @@ Three functions to get information are pre-defined:
 3. wizard
 
 #### get_integer
-This allows to set a number by twiddling the shaft of the encoder.  The number is entered by click and is stored in a global dictionary called data.
-The key is set by the field parameter.
+This allows us to set a number by twiddling the shaft of the encoder.  The number is entered by clicking the switch.  The result is stored in a global dictionary called data.  The key is set by a field parameter.
 
 ``` python
 sethours   = get_integer(field = 'hour', low_v=1,high_v=24,increment=1,caption='Hours',field='hour')
@@ -68,14 +61,14 @@ if data['hour'] = 10:
 
 #### get_selection
 
-The selection function lets us get a string value from a list of values. The list is similar to a menu's list.  There is also a field parameter.
+The selection function lets us get a string value from a list of values. The list is similar to a menu's list but  also has a field parameter.
 
 ```python 
 colour1 = selection('colour1',['RED',('Green','GREEN'),('Blue','BLUE'),('Yellow','YELLOW'),('WHITE','white')])
 ```
 
 As we turn the shaft the name of the various colours is displayed.  
-When we click the shaft the current value is returned.  
+When we click the shaft the current value we return to the parent menu and the value string is stored in the global dictionary called data.  
 The name displayed is the first value in the tuple and the value returned is the second element of the tuple.  
 There is an option to just provide a string (say "RED"). 
 In this case the string value is exanded to a tuple ('RED','RED') behind the scenes.
@@ -93,28 +86,30 @@ The wizard calls a series of functions in sequence.  We define  a wizard  simila
 timewizard = wizard([("Hours",sethours),("Minutes",setminutes),("Seconds",setseconds)])
 
 This wizard will gather hours, minutes and seconds in that order,   then return.
+The list looks like the list used to define a menu but in fact the caption is ignored.
 
-sethours is a another function called  gets_integer with some parameters that (define as defaults parameters) for a caption, maximum value, minimum value. Increment  tells get_integer how much to expand the value on each click of the encoder.  
+setencoder is a another function called  gets_integer with some parameters that (define as defaults parameters) for a caption, maximum value, minimum value. Increment  tells get_integer how much to expand the value on each click of the encoder.  
 For instance if we set a percentage, 100 clicks is pretty tedious. 
 We can set the encoder to return values between 0 and 10 and then expand the value by 10 by increment so we can get from 0 to 100 with 10 clicks.   
 
 ## How to get data out of the system.
 
-Data is returned by the functions get_integer and selection.  
-Each of these functions has a parameter called field.  
+Data is returned by the functions get_integer and selection which have a parameter called field.  
 There is a global dictionary in the  encodermenu module called data and values are stored in this dictionary. 
 It is up to you what you want do do with the values.
 
-For instance in the selection above the field name is 'colour1'.  If we clicked on the screen while  it was showing 'RED' the dictionary would contain the folllowing
-encodermenu.data['colour1'] = 'RED'
 
 ### How to set default values
-We can set default values by setting the encodermenu.data before we run mainloop.  get_integer and selection  read the data dictionary, both when they are created and when they are revisited through the menu system to get the intial value.   The  current value in data is displayed, and  then can  be altered by scrolling.
+We  set default values by setting values in the global dictionary encodermenu.data, before we run mainloop. 
+When  one of the data functions, get_integer or selection start, the initial value is taken from the data dictionary.
+This happens both on the occasion of first use  and also later if we revisit the data function through the menu system.
 
-If you do not provide a default value get_integer will default to zero (0) and selection will default to 'dummy'
+get_integer and selection  read the data dictionary, both when they are created and when they are revisited through the menu system to get the intial value.   The  current value in data is displayed, and  then can  be altered by scrolling.
+
+If you do not provide a default value in the data dictionary get_integer will default to zero (0) and selection will default to 'dummy'
   
  ### The info function.
- The info function just displays a screen of text which will be shown when you click its menuitem. Any click or scroll with clear the display (back to the menu).   You can provide the text as a simple string but you can also provide a function that returns a string.  This would allow you, for instance, to display the current time. These alternatives are show below
+ The info function just displays a screen of text which will be shown when you click its menuitem. Any click or scroll with clear the display (back to the menu).   You can provide the text as a simple string but you can also provide a function that returns a string.  This would allow you, for instance, to display the current time. Examples of these alternatives are show below:
 
 ```python
 showtime = info('I dont have a clock')
@@ -124,15 +119,15 @@ showtime = info(my_gettime_function)
 
  ##  Writing action functions.
  
-There are several considerations so we will need to come back to this topic later.
-At this stage you can just write a function as long as it is quick.
+There are several considerations in writing action functions so we will need to come back to this topic later.
+At this stage you can just write a function as long as it runs quickly.
  
   ```python
   def  showblueneopixels():
       for a in range(smallnumber):
          do_something()
   ```
-This will work  as a menu function.  The menu will be unchanged, which is usually fine, especially if your function is quick. 
+This will work  as a menu function.  The menu will be unchanged, which is usually fine, especially if your function is small and quick. 
 However, if the function takes a long time to run it will block and the menu system will freeze.
 We can get around blocking by writing an async function.  More on this later.
 
@@ -140,26 +135,37 @@ We can get around blocking by writing an async function.  More on this later.
 
 # How it works - some implementation details.
 
-The system runs a bit like a gui.
+The system runs a bit like a normal event driven GUI.
 There is a event loop that polls the switch and the encoder. 
 If the switch is pressed or the value of the encoder changes then an on_click or on_scroll event is called.
-Events are handled by an object, which can be a Menu, GetInteger, Selection, Info Wizard and so on.
-The object handling the events is a global  called current.
+Events are handled by an object, which can be a Menu, GetInteger, Selection, Info, Wizard and so on.
+The object handling  events is a global variable called current.
 We change menus and entry screens etc by changing the current object.
 The main loop runs as an asyncio task so it does not block.
 Any function called within the menu system is also running within the asyncio loop so it can be a task or routine.
-A convenience function call make_task is provided which store the task in a global variable called task.
+A convenience function called make_task is provided which stores the task in a global variable called task.
 A second convenience function called stop can stop the running task.
-(Note: This simple system with only handle one task. You can run more task but you will have to manange them himself).
+(Note: This simple system will only handle one task. You can run more tasks,   but you will have to manange them yourself).
 
-When we click a menuitem with one of the predefined objects like Menu, GetInteger, Selection etc the object is putt on a stack.
+When we click a menuitem with one of the predefined objects like Menu, GetInteger, Selection etc the object is put on a stack.
 There is a special function called back which pops the object off the stack so we can go back to where we came from.
 Actually we could handle with another event called back.  You could provide this, if you want,  by polling for another switch.
 I found that just having a back functions is quite intuitive and it is simple.
 
+### Going back up the menu 
+If we click on a menu we go further into the tree down a branch,   or we hit a leaf.  But what if we want to go back up the tree?   In this simple Menu we go back back by executing a back function that pops us back at the first item in the previous menu. I find this is intuitive and works well plus it does not require any extra hardware.
+
+Advanced note.
+The functions wrap_menu, wizard, get_integer, info and selection  have an object that they push on the stack and make current.  
+The object is popped off when we go back.
+A simple function will not put itself on the stack so the controlling object remains the current object.  When you click or scroll it will work
+as it did before the simple function was callled.
+
+
 ### Various issues
-1. Be careful to define submenus before main parent menus.  If not you will get varibale not defined errors.
-2. 
+1. Be careful to define submenus before main parent menus.  If not you will get "variable not defined" errors.
+2. Going back.  The system defines a scroll event for  going up and down the menu structure and a click event that goes forward.  
+ You note that we have no event to go back.  To get around this there is a back function that can be called from a menu item. 
 
 
 
@@ -167,8 +173,7 @@ A menu is like a tree.  We start off on the trunk ("main_menu") and from this su
 
 We have to write the main_menu last because it will refer to branchs above. In this case our display will show "Patterns" then "Trees" then "Brightness" as we turn the rotary encoder. If we click the "go" button (I use the switch on the shaft that comes with the encoder I used ) a function associated with the menu item will be executed. If we click on "Patterns" the patterns menu we defined in the line above will show.  Similarly for the "tees" menu. However if we click on Brightness we will excute a brightness function.  This allows us to enter an integer value for brightness. (More on this later).
 
-### Going back up the menu 
-If we click on a menu we go further into the tree down a branch,   or we hit a leaf.  But what if we want to go back up the tree?   In this simple Menu we go back back by executing a back function that pops us back at the first item in the previous menu. I find this is intuitive and works well plus it does not require any extra hardware.
+
 
 An alternative would be to provide a back button.  Another alternative is to get some extra events off our simple button (like long-press or double click)  I will show how this can be done later. (The menu uses  uasyncio which  has  a good primitives libary from Peter Hinch that allows us to easily program for long presses or double clicks)
 
@@ -177,23 +182,21 @@ We note that a menuitem is defined as tuple composed of a string menu item capti
 
 After we have provided a list of menu-items we have to wrap the list up into a function and we do this by using the wrap function.  This means that both actions and submenus are handled the same way in our system.  A submenu is simply an action that installs a new menu.
 
-#### How to write and action or menu function.
-Writing a menu or submenu is easy, - we just pass the list to the wrap funcion which does the work for us.
 
-All menu functions (including submenus) are a function that takes one parameter. When the function is called the Menu class passes in self so that the function acts like like a temporary method of the Menu class.  This gives us access to other methods in the Menu class but we can ignore the self parameter if we dont need it. Although action functions only have one parameter it is possible to pass extra information via default values or literals inside our functions or closures. (Examples below) 
 
-#### Builtin  methods
-Some functions are  built in:
-1. back - There is a back function that goes back up the menu
-2. get_integer. This is an action that allows to enter an integer via the rotary encoder.  The value entered is stored in a data dictionary so it is available to other actions.
-3. wrap.  This function takes a menu list and returns a menu function.
 
+
+### Housekeeping before writing a menu system.
 
 First some housekeeping because some of the setup may be a bit unfamiliar
-We have to import some modules and get the menu running.
-
-### Housekeeping
-
+1.  We have to import some modules to get the menu system working.
+2.  Hardware considerations.  
+ We have to import drivers to get our encoder, switch and display working.   I believe that the drivers I am using are pretty standard so they should work out of the box.  
+  Switches are pretty basic so I have not provided any extra functions for these. (Later versions may provide double-click and long press events)
+  The encoders delivers numbers within a specified range that go up or down depending on which way we turn the shaft.  In order to make it easier to use alternative encoders there  are "hardware abstraction functions":  setencoder  and  encodervalue .
+ 3. Define our Menus, getting data functions  and our  display funcitons.
+ To get things started we call the main-menu function which will install itselff as the first menu. 
+ 4. Write some functions to actually do stuff.  These will probably use  the uasyncio module.
 ``` python
 from encodermenu import Menu  #this the Menu class
 from neopixel import * #We use neopixels as an example of menu actions
