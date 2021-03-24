@@ -1,63 +1,74 @@
 # Micropython encoder based menu
 
 
-This simple menu system is written in micropython and uses a switch,  a rotary encoder and an OLED display.  It was developed  on a Raspberry Pi Pico but also runs on an ESP32 and ESP8266.
+This is a simple menu system written in micropython.  It uses a switch,  a rotary encoder and an OLED display.  It was developed  on a Raspberry Pi Pico but also runs on an ESP32 and ESP8266.
 
-The prototype used a little 128 * 64 pixel SSD1306 based OLED.  It could an be  adapted to other displays using micropython's framebuffer or even  a very basic like a one line display like a liquid crystal display.  The switch used was just the switch on the shaft of the encoder.=
+The prototype used a little 128 * 64 pixel SSD1306 based OLED.  It could an be  adapted to other displays using micropython's framebuffer or even  to a very basic like a one-line display like a liquid crystal display.  The rotary encoder I used has a switch on the shaft, which is used as the click button.  The Rotaryirq esp32 library worked perfectly on Raspi Pico and the display used the library SSD1306IRQ.py
 
-Initially there is the root menu shows a number of menu items.   Each menuitem is associated with a python function which takes no parameters.  If we want to supply parameters we have to use default values or closures. The menu-item's function can branch to a new menu, get data from the user or perform functions  suchas  flashing neopixels, or setting a clock.  By branching from  menu items there can be any number of submenus.
+When the Pico is  started the root menu is shown and menuitems are actioned when the switch is clicked.  Any number of subitems can be shown.  Possible menu actions include running a Python funciton, entering an integer by twiddling the encoder and entering a string.
 
-Some  activities may take a long time (if ever) to complete,  for instance flashing neopixels  in an endless loop.  In order to remain responsive the system  uses  multitasking with uasyncio.   In this way we can run the menu itself while  at the same time doing other activities..
+Since some functions can be slow or can block, the menu runs within an asyncio loop.
 
 
-## Menu and Submenus
+## Defining menus and Submenus
 
-Menus are defined as a list of menu-items.
+Menus are defined as a list of menu-items. Submenus are really the same as menus.
 A menu item is defined as a pair of values:
 
 	1.  A Caption  (string)
 	2. An action function (a python function with NO parameters)
 
+Example of a main menu and two submenus called trees and patterns.
+
 
   ```python
+trees     = wrap_menu( [('gum',wizard),('ti-tree',info),('red-gum count',get_integer),('willow',treesize),('Back!',back)])
 
-trees     = wrap_menu( [('gum',data),('tea-tree',data),('red-gum count',data),('willow',data),('Back!',back)])
-
-patterns  = wrap_menu( [('Chaser',yellow),('Red',red),('Blue',ablue),('Rainbow',rainbow),('Back!',back)])
+patterns  = wrap_menu( [('Chaser',yellow),('Red',red),('Blue',blue),('Rainbow',rainbow),('Back!',back)])
 
 main_menu = wrap_menu( [('Patterns',patterns),('trees',trees),('Brightness',brightness)])
 
-```
+  ```
 
-Here we have defined three menus, 'trees', 'patterns' and 'main_menu'.
-Note that the caption needs quotes (because it is a string), but the function does not because it is just the name of a function.
+
+Here we have defined three menus, 'trees', 'patterns' and 'main_menu'.  
+
+Note that the menu caption needs quotes (because it is a string), but the function does not because it is just the name of a function.
 
 To transform our list into a function we pass it to another function called 'wrap_menu'.  Since our menu becomes a function,  it can be the function that is called from a menuitem.  In this way we can get sub-menus.
 
-Menu function must be defined before they are used, thus the root menu should be the last to be defined.
+Menu function must be defined before they are used.  The root menu should be the last to be defined.
+
+
 
 ### Functions to get information
-Three functions to get information are pre-defined:
+
+There are three predefined functions to get information:
+
 1. get_integer
 2. get_selection
 3. wizard
 
 #### get_integer
+
 This allows us to set a number by twiddling the shaft of the encoder.  The number is entered by clicking the switch.  The result is stored in a global dictionary called data.  The key is set by a field parameter.
 
 ``` python
 sethours   = get_integer(field = 'hour', low_v=1,high_v=24,increment=1,caption='Hours',field='hour')
 ```
 
-Later the value can be retrieved as below:
+Later the value can be retrieved from the global dictionary data  as shown in the example below:
 
 ``` python
-
 if data['hour'] = 10:
 	pass
 	#Then do something
 
 ```
+
+The value from the encoder ranges from low to high.  It goes up or down by one each time we turn the encoder by one click. Sometimes the desired value is a relatively high number, say 0-100 for percentages.
+
+Doing 100 clicks is tedious if we do not really need that degree of precision. The encoder value is multiplied by Increment when it is stored or displayed.  In this way,  with an increment of 10 for instance,  we can go from 0 to 100 with 10 clicks.
 
 #### get_selection
 
@@ -67,105 +78,189 @@ The selection function lets us get a string value from a list of values. The lis
 colour1 = selection('colour1',['RED',('Green','GREEN'),('Blue','BLUE'),('Yellow','YELLOW'),('WHITE','white')])
 ```
 
-As we turn the shaft the name of the various colours is displayed.  
-When we click the shaft the current value we return to the parent menu and the value string is stored in the global dictionary called data.  
-The name displayed is the first value in the tuple and the value returned is the second element of the tuple.  
-There is an option to just provide a string (say "RED"). 
+The name displayed is the first value in the tuple and the value returned is the second element of the tuple.  There is an option to just provide a string (say "RED"). 
 In this case the string value is exanded to a tuple ('RED','RED') behind the scenes.
 
-```python 
-colour1 = selection('colour1',['RED',('Green','GREEN'),('Blue','BLUE'),('Yellow','YELLOW'),('WHITE','white')])
+As we turn the shaft the name of the various colours are scrolled, in the same way as a menu.  
+When we click the shaft  value string is stored in the global dictionary and we return to the parent menu.  
 
-#color1 is the field parameter
-```
+**Default values for selection and get_integer**
+
+A selection or get_integer is initialised to the value already in the dictionary,  if a value exists for that field, otherwise the initial value is zero or an empty .  This way we can get a default value by storing values in the dictionary before starting the program and we can revisit the selection to change values.
 
 #### Wizard and get_integer
-In small microprocessor systems we often want to enter a series of numbers like hours, minutes and seconds to set a clock.  
-The wizard calls a series of functions in sequence.  We define  a wizard  similarly to a menu.
+
+In small microprocessor systems we often want to enter a series of numbers.  For instance we may want to set   hours, minutes and seconds for a clock or day, month year to set the date.  
+
+The wizard calls a series of functions in sequence, usually get_integer.  A  wizard  is defined similarly to a menu.
 
 timewizard = wizard([("Hours",sethours),("Minutes",setminutes),("Seconds",setseconds)])
 
 This wizard will gather hours, minutes and seconds in that order,   then return.
-The list looks like the list used to define a menu but in fact the caption is ignored.
+The list looks like the list used to define a menu but in fact the caption is ignored ( because a caption is provided to get_integer.)
 
-setencoder is a another function called  gets_integer with some parameters that (define as defaults parameters) for a caption, maximum value, minimum value. Increment  tells get_integer how much to expand the value on each click of the encoder.  
-For instance if we set a percentage, 100 clicks is pretty tedious. 
-We can set the encoder to return values between 0 and 10 and then expand the value by 10 by increment so we can get from 0 to 100 with 10 clicks.   
-
-## How to get data out of the system.
-
-Data is returned by the functions get_integer and selection which have a parameter called field.  
-There is a global dictionary in the  encodermenu module called data and values are stored in this dictionary. 
-It is up to you what you want do do with the values.
-
-
-### How to set default values
-We  set default values by setting values in the global dictionary encodermenu.data, before we run mainloop. 
-When  one of the data functions, get_integer or selection start, the initial value is taken from the data dictionary.
-This happens both on the occasion of first use  and also later if we revisit the data function through the menu system.
-
-get_integer and selection  read the data dictionary, both when they are created and when they are revisited through the menu system to get the intial value.   The  current value in data is displayed, and  then can  be altered by scrolling.
-
-If you do not provide a default value in the data dictionary get_integer will default to zero (0) and selection will default to 'dummy'
-  
  ### The info function.
- The info function just displays a screen of text which will be shown when you click its menuitem. Any click or scroll with clear the display (back to the menu).   You can provide the text as a simple string but you can also provide a function that returns a string.  This would allow you, for instance, to display the current time. Examples of these alternatives are show below:
+
+ The info function just displays a screen of text which will be shown when you click its menuitem. Any click or scroll with clear the display (back to the parent menu).   You can provide the text as a simple string but you can also provide a function that returns a string.  This would allow you, for instance, to display the current time. 
+
+Examples of these alternatives are show below:
 
 ```python
 showtime = info('I dont have a clock')
 showtime = info(my_gettime_function)  
-# don't use brackets on the function
+# don't use brackets on the function name
 ```
 
+ ##  
+
+## How to get data out of the system.
+
+An integer or a string  is returned by the functions get_integer and selection.  Both of these functions  have a parameter called field.  The fields is used as the key to store the value in a global dictionary.
+
+Since the data dictionary is global it can accessed by other functions.
+
+### Hardware abstraction functions
+
+These functions are provided  as a form of hardware abstraction in case you wnat to us different libraries from  SSD1306_i2c,  rotary-irq library.
+
+**set_encoder(minimum_value, maximum_value,increment)**
+
+*setencoder* sets the rotary encoder so that value ranges between the maximum and minimum value inclusive. It increments on clockwise clicks and decrements on anti-clockwise clicks. It wraps over to minimum after click maximum and vice versa.  This is the standard behaviour of the library rotary_irq.
+
+Calls  *rotary_irq.setencoder()*
+
+Setencoder is provider as a function as a form of hardware abstraction in case you use a different rotary encoder library.
+
+**get_value()**
+
+Returns  the encoder value as an integer.
+
+Same as rotary_irq.encoder.value()
+
+***display(text)***
+
+Display lines of text on the display device.  Up to 4 lines of text are allowed.
+
+
+
+### Utility functions
+
+***back()***
+
+Clicking goes forward in a menu and scrolling goes up and down but we need a way to go back.  This is achieved by calling the back function as a menu action. (see menu examples).
+
+If we had a way to provide more events than simple clicking and scrolling we could use one of these events to go back.  Possible sources for such an event would be another button or using long push or double click on a single button.  While easy to implement, this has not been done since the current system seems quite intuitive.
+
+***make_task(coroutine)***
+
+This simple turns a co-routine into a task and stores the task in a global variable called task.  Its main use is to hide the global.
+
+***Stop()***
+
+This cancels the global task above.  This way we can make and stop tasks without worrying about global declarations.  For instance if we have a rolling rainbow display on neopixels this should be run as a task, otherwise it will block the menu.  We can make the task by passing our function or more precisely our co-routine to *make_task()*.  If we want to run a different pattern we would stop the current pattern by calling *stop().*
+
+
+
  ##  Writing action functions.
- 
-There are several considerations in writing action functions so we will need to come back to this topic later.
-At this stage you can just write a function as long as it runs quickly.
- 
+
+There are several considerations in writing action functions.
+
+
+
+**Simplest**
+
+The simplest action function is just a normal python function with no parameters.
+
+
+
   ```python
   def  showblueneopixels():
-      for a in range(smallnumber):
-         do_something()
+    	make_strip_blue()
   ```
+
 This will work  as a menu function.  The menu will be unchanged, which is usually fine, especially if your function is small and quick. 
+
+**An action function with parameters.**
+
+``` python
+def showpixels(colour):
+  make_strip(color)
+ 
+#There are two ways to convert this into a function with no parameters
+def showpixels(color = 'blue'):
+  make_strip(color)
+# calling showpixels() with no parameters will make the strip blue
+
+def wrap_show_pixels():
+  color = 'blue'
+  def show_pixels(color):
+    	make_strip(color)
+  return show_pixels
+
+# calling wrap_show_pixels() with no parameters will make the strip blue
+  
+```
+
+**Writing a co-routine or multiasking.**
+
+There are several tutorials about multitasking with asyncio. Peter Hinchs tutorial is a particularly good one but gets moderately advanced.
+
+Action functions that run for a long time like endless loops should be written as co-routines otherwise they will block and stop the menu working.
+
 However, if the function takes a long time to run it will block and the menu system will freeze.
-We can get around blocking by writing an async function.  More on this later.
+We can get around blocking by writing an async function.  
 
+I will assume that a  program is long running because it  has a loop, which is usually the case.
 
+**The steps to turn a function  into a co-routine and then a task: **
 
-# How it works - some implementation details.
+1. Import uasyncio as asyncio to make the async functions available.
 
-The system runs a bit like a normal event driven GUI.
-There is a event loop that polls the switch and the encoder. 
-If the switch is pressed or the value of the encoder changes then an on_click or on_scroll event is called.
-Events are handled by an object, which can be a Menu, GetInteger, Selection, Info, Wizard and so on.
-The object handling  events is a global variable called current.
-We change menus and entry screens etc by changing the current object.
-The main loop runs as an asyncio task so it does not block.
-Any function called within the menu system is also running within the asyncio loop so it can be a task or routine.
-A convenience function called make_task is provided which stores the task in a global variable called task.
-A second convenience function called stop can stop the running task.
-(Note: This simple system will only handle one task. You can run more tasks,   but you will have to manange them yourself).
+1. put async before def
+2. Put "await asyncio.sleep(0)" into the loop so it is called frequently.  This makes our function play nicely with others, including the main menu.
+3. Turn the co-routine into a task.  This also starts it running. We dont have to await it. Make_task(co-routine ) is provided as a utility.
+4. cancel the task when we want our loop to stop. Stop() s is provided as a utility.
 
-When we click a menuitem with one of the predefined objects like Menu, GetInteger, Selection etc the object is put on a stack.
-There is a special function called back which pops the object off the stack so we can go back to where we came from.
-Actually we could handle with another event called back.  You could provide this, if you want,  by polling for another switch.
-I found that just having a back functions is quite intuitive and it is simple.
+Example:
 
-### Going back up the menu 
-If we click on a menu we go further into the tree down a branch,   or we hit a leaf.  But what if we want to go back up the tree?   In this simple Menu we go back back by executing a back function that pops us back at the first item in the previous menu. I find this is intuitive and works well plus it does not require any extra hardware.
+``` python
+import uasyncio as aysncio
+from encodermenu import make_task, stop
 
-Advanced note.
-The functions wrap_menu, wizard, get_integer, info and selection  have an object that they push on the stack and make current.  
-The object is popped off when we go back.
-A simple function will not put itself on the stack so the controlling object remains the current object.  When you click or scroll it will work
-as it did before the simple function was callled.
+# Define this in the body of the program (or locally in the action function if you want)
+async def loopy_function():
+    do_something()
+    await asyncio.sleep(0)
+    
+#In our action function
+def my_action_function():
+  stop() # stop any previously running tasks 
+  make_task(loopy_function) # this will make a task and run it
+  #note there are no brackets on our loopy_function
+
+```
+
+# How it works
+
+* The system runs a bit like a normal event driven GUI.
+* There is a event loop that polls the switch and the encoder. 
+* If the switch is pressed or the value of the encoder changes then an on_click or on_scroll event is called.
+* Events are handled by an object, which can be a Menu, GetInteger, Selection, Info, Wizard and so on.
+* The object currently handling  events is a global variable called current.
+* We change menus and entry screens etc by changing the current object.
+* The convenience function back() pops the parent object off the stack and makes it current
+* The main loop runs as an asyncio task so it does not block.
+  Any function called within the menu system is also running within the asyncio loop so it can be a task or routine.
+* A convenience function  make_task  stores the task in a global variable called task.
+* A  convenience function called stop can cancels  the running task.
+  (Note: This simple system will only handle one task. You can run more tasks,   but you will have to manange them yourself).
 
 
 ### Various issues
+
 1. Be careful to define submenus before main parent menus.  If not you will get "variable not defined" errors.
 2. Going back.  The system defines a scroll event for  going up and down the menu structure and a click event that goes forward.  
- You note that we have no event to go back.  To get around this there is a back function that can be called from a menu item. 
+   You note that we have no event to go back.  To get around this there is a back function that can be called from a menu item. 
 
 
 
@@ -178,436 +273,8 @@ We have to write the main_menu last because it will refer to branchs above. In t
 An alternative would be to provide a back button.  Another alternative is to get some extra events off our simple button (like long-press or double click)  I will show how this can be done later. (The menu uses  uasyncio which  has  a good primitives libary from Peter Hinch that allows us to easily program for long presses or double clicks)
 
 ### Writing a menu (menus are functions and actions are functions)
+
 We note that a menuitem is defined as tuple composed of a string menu item caption and an action that is performed if the menu is clicked, like so ('Caption1', action1).  A menu is a list of menu-items.  (Note - we could use either lists or tuples - it does not really matter).  
 
 After we have provided a list of menu-items we have to wrap the list up into a function and we do this by using the wrap function.  This means that both actions and submenus are handled the same way in our system.  A submenu is simply an action that installs a new menu.
 
-
-
-
-
-### Housekeeping before writing a menu system.
-
-First some housekeeping because some of the setup may be a bit unfamiliar
-1.  We have to import some modules to get the menu system working.
-2.  Hardware considerations.  
- We have to import drivers to get our encoder, switch and display working.   I believe that the drivers I am using are pretty standard so they should work out of the box.  
-  Switches are pretty basic so I have not provided any extra functions for these. (Later versions may provide double-click and long press events)
-  The encoders delivers numbers within a specified range that go up or down depending on which way we turn the shaft.  In order to make it easier to use alternative encoders there  are "hardware abstraction functions":  setencoder  and  encodervalue .
- 3. Define our Menus, getting data functions  and our  display funcitons.
- To get things started we call the main-menu function which will install itselff as the first menu. 
- 4. Write some functions to actually do stuff.  These will probably use  the uasyncio module.
-``` python
-from encodermenu import Menu  #this the Menu class
-from neopixel import * #We use neopixels as an example of menu actions
-import neopixel
-
-H = Menu()  # Make a menu object
-#Remember main_menu is a function with one parameter 
-# So we have to set it up like this....
-main_menu(H)
-#The menu runs asynchonously.  This means we can write long running actions without block the main menu.  
-#It is not necessary to know about async programming to get started.
-# Further information on async aspects of this program below
-
-asyncio.run(H.mainloop())# Run our encoder and switch loop asynchonously
-
-#Usually the program above will be in an endless loop.
-print('finished - probably wont get here')
-```
-	
-2. Write an async function.
-  ``` python
-async def  showblueneopixels():
-	for a in range(smallnumber):
-		do_something()
-		await asyncio.sleep(0)
-  ```
-
-To turn an ordinary function into an async function put async before def  then sprinkle some await asyncio.sleep(0) statements to make it play nice with others.  
-	
-If you want more intelligent instruction than this there are plenty of tutorials to google.  Peter Hinchs tutorial is very good but does get moderately advanced.
-	
-This function will work with the menu system but will likely prevent you from running other functions.  To get around this we need to make a task.
-	
-3. Write an async task.
-  ``` python 
-  def my_task_function()
-      stop()
- 	    make_task(show_blue_pixels)
- ```
-# ddd    
- The menu encoder module provides two utility functions for tasks.  The first one is stop(). This cancels  other running tasks (say a continually running rainbow on neopixels) and allows you start another one.  make_task makes a global task called task.  Stop stops that global task.  This allows you to run one long running function after another.
- 
-4. Running several long running functinons simultaneously. 
-This can be done but is beyond the scope of this tutorial. Basically you give each function its own task.  If necessary,  then work out some way to stop them.  I would recommend Peters tutorial at this point.
-
-5. Write a function that does something on the screen.  
-There are a few possibilities.
-	a. Quick function.  Just display something on the screen.  It will stay there until you scroll or click. 
-	b.  One work around for a volatile display would be to adjust your display function so that is does not alter the bottom line of your display on scroll or click allowing a message to persist.
-	c. Slow or async function.  Write something to the display from time to time.
-	
-
-
-### How to write  actions - by example
-
-```python
-
-num_pixels = 75  
-    
-# this is taken from the Pi Pico neopixel example
-def pixels_fill(color):
-    for i in range(len(ar)):
-        pixels_set(i, color)
-    
-def ablue(self):
-    "Menu function One way to call an async function"
-    #This program is really quick so it does not really need to be
-    #asynchonous.
-    print('async blue')  #Just to show we got here
-    self.stop()  # stop other async functions
-    async def show_blue():  #This is pretty much the same as the exampel
-        neopixel.pixels_fill(BLUE)
-        pixels_show()
-    self.t = asyncio.create_task(show_blue())
-
-def blue(self):  #same thing as ablue but as anormal function
-    "Menu function.  Ignores self and makes neopixels blue"
-    print('in blue')
-    self.stop()#Optional but we still should stop other tasks
-    neopixel.pixels_fill(BLUE)
-    pixels_show()
-
-def red(self):  #Pretty much the same as ablue above
-    print ('red')
-    self.stop()
-    async def temp():
-        pixels_fill(RED)
-        pixels_show()
-    self.t =asyncio.create_task(temp())
-        
-def rainbow(self):
-    "call an async function defined elsewhere"
-    print('start rainbow')
-    self.stop()
-    #Shows a moving rainbow so can take a while.
-    #This is the sort of function that we should make asynchronous
-    #Note that we save the task as self.t so we can stop it if necessary
-    self.t = asyncio.create_task(rainbow_cycle(self))
-
-
-def yellow(self):  #Same as red and ablue only even more minimal
-    neopixel.pixels_fill(YELLOW)
-    neopixel.pixels_show()
-    
-async def rainbow_cycle(self):  # A full asynchronous loop
-    "Show a rainbow but yield frequently for menus etc"
-    self.stop() #stop other tasks
-    for k in range(255):
-        for j in range(255):
-            for i in range(NUM_LEDS):
-                rc_index = (i * 256 // NUM_LEDS) + j
-                neopixel.pixels_set(i, wheel(rc_index & 255))
-                await asyncio.sleep(0) # give someone else a go
-            neopixel.pixels_show()
-            await asyncio.sleep(0)# give someone else a go
-
-#Now that we have some actions we can finally define some menus
-
-trees     = wrap( [('gum',data),('tea-tree',data),('red-gum count',data),('willow',data),('Back!',back)])
-patterns  = wrap( [('Chaser',yellow),('Red',red),('Blue',ablue),('Rainbow',rainbow),('Back!',back)])
-main_menu = wrap( [('Patterns',patterns),('trees',trees),('Brightness',brightness)])
-
-#Bit more housekeeping.
-H = Menu()
-main_menu(H) # This sets up the main or root menu
-asyncio.run(H.mainloop())  #make it go
-
-asyncio.run(blue(3))
-print('finished')
-
-```
-
-## Source of Encoder menu class (with extra comments)
-
-``` python 
-import math
-from machine import Pin, I2C
-import ssd1306  # The display
-#import sys 
-#import time  #In case we want to do precise time extra 
-import uasyncio as asyncio
-
-#from guimenu importMenu
-#import _thread
-
-#I use a sparkfun encoder with a switch in the shaft.  There are also some  coloured LEDS in the transparent shaft but I dont use them
-from rotary_irq_pico  import RotaryIRQ # The encoder library
-
-switch = Pin(18,Pin.IN,Pin.PULL_DOWN)  # I use the shaft of the encoder as the switch to initiate menu actions
-
-encoder = RotaryIRQ(pin_num_clk=12, 
-              pin_num_dt=13, 
-              min_val=0, 
-              max_val=100, 
-              reverse=False, 
-              range_mode=RotaryIRQ.RANGE_WRAP,
-              pull_up=True)
-              
-#I use a little OLED display
-i2c = I2C(0, scl=Pin(17), sda=Pin(16))
-oled = ssd1306.SSD1306_I2C(128, 64, i2c)
-
-
-class Menu():
-    def __init__(self):
-        
-        self.menu_stack =[] # parent menus - so we can go back
-        self.menu = None  # store current menu
-        self.data = {} # A dictionary to hold values we may enter
-        #Things work slighlty differently when we are traversing the menu from when we are entering a number - so I "vector" clicking and scrolling
-        self.do_scroll = self.menu_scroll
-        self.do_click = self.menu_click
-        self.do_show   = self.menu_show
-        self.ar =[]       
-
-    def mainloop(self):
-        "An asynchronous main loop"
-        #We only do scroll stuff or button clicks when they change
-        self.old_v = self.value 
-        self.old_switch = switch()
-        self.do_show() #Make sure we show the menu when we first start up
-        while True:
-            await self.step()  #step is a coroutine so await it
-    
-    async def step(self):
-        """Poll scroll and switch asynchonously
-        so we can run something else like neopixels at the same time.
-        do_scroll and do_switch are vectors 
-        so they  can  be  changed 
-        """
-        #only handle the scroll value if it changes
-        self.enc_v = self.value
-        if self.enc_v != self.old_v:
-            self.do_scroll()
-            self.old_v = self.enc_v
-        #Only do click action if switch is on AND it has changed    
-        self.sw_v = switch()
-        if self.sw_v != self.old_switch:
-            if self.sw_v:
-                self.do_click()
-            self.old_switch = self.sw_v
-            await asyncio.sleep_ms(200) #helps with debounce
-        await asyncio.sleep(0)  #give someone else a go
-    
-    def text(self,txt):
-        "Show some text"
-        # This should work unaltered for any display that 
-        # uses framebuffer
-        #For any display clear it and show a line of text
-        oled.fill(0)
-        oled.text(txt,0,30)
-        oled.show()
-             
-    def text2(self,txt1,txt2):
-        """Two rows of text, built for get_integer(), 
-        but not limited to this purpose"
-        In get_integer txt1 is a caption, txt2 shows the current integer 				value"""
-      # for a more display just keep stuff on one line
-        oled.fill(0)
-        oled.text(txt1,0,0)
-        oled.text(txt2,0,30)
-        oled.show()
-
-#---------------------------------
-    #A property just lets us refer to scroll value as self.value
-    #rather than self._value or self.value()
-    @property
-    def value(self):
-        return encoder._value
-        
-    @value.setter
-    def value(self,value):
-        "Get current scroll value"
-        encoder._value = value
-    
-    def setscroll(self,min_v,max_v,inc_v,value):
-        encoder.set(value,min_v,max_v)
-        # NB increment is only used outside encoder in
-        #this implemenattion       
-        self.increment = inc_v        
-    
-    def menu_show(self):
-        "Show the current menu item"
-        self.text(self.menu[self.value][0])
-        
-    def set_menu(self,menu):
-        #Set up for a menu using the encoder value and a switch click
-        self.menu = menu
-        # we need to put the menu on a stack so we can come back
-        self.menu_stack.append(menu)  
-        
-        self.setscroll (0,len(menu)-1,1,0) #keep value within range       
-        self.do_scroll = self.menu_scroll #set menu vector   
-        self.do_click = self.menu_click #set click vector
-        
-        self.menu_show() # all done - now show the menu
-
-    def menu_scroll(self):
-        self.menu_show()
-    
-    def menu_click(self):
-        "menuitem has caption and a function"
-        #Execute the function, passing self to it
-        (self.menu[self.value][1])(self)
-  
- #Now define some useful methods to use as menus menu functions
-
-    def back(self):
-​       "go back up then menu by excuting this function     
-        if len(self.menu_stack) > 1:
-            #the current menu is on the stack so we have to pop it off
-            #unless there is only the root menu on the stack
-            self.menu_stack.pop()
-        mymenu = self.menu_stack.pop()
-        self.set_menu(mymenu)
-
-#This allows us to enter a integer value and store it a data dictionary 
-#belonging to the menu class
-#By default the caption is show at top of the screen which does not change (say Brightness (%) for example) 
-# The value is in the middle of the screen and changes as we turn the encoder.
-# When we click the button the value is stored in our data field and we pop back to the menu.
-#If we want to enter a percentage between 0 and 100 or some other large value it might be annoying to have to do 100 clicks.
-# Increment allows us, for example, to do 10 clicks but display them as 10 to 100.
-
-
-    def get_integer(self,low_v=0,high_v=10,increment=10, caption='plain',field='datafield'):
-        #set data field
-        self.field = field
-        self.do_click = self.integer_click
-        self.do_scroll = self.integer_show
-        self.do_show = self.integer_show 
-        self.caption = caption
-        self.menu_stack.append(self.menu) 
-        
-        try:
-            data = int(self.data.get(field,0))
-            if data > high_v:
-                data = high_v
-            if data < low_v:
-                data = low_v
-        except:
-            data = 0
-            
-        self.setscroll(low_v,high_v,increment,data)
-        self.do_show()
-
-
-​        
-
-    def integer_show(self):
-        """Show a caption and a value which changes on scroll"
-        Increment allows us (for instance) to have  only 10 clicks to get to 100% instead of 100 clicks """
-        self.text2(self.caption,str(self.value*self.increment))
-
-    def integer_click(self):
-        "Store the displayed value and go back up the menu"
-        self.data[self.field]= self.value * self.increment
-        
-        #? await asyncio.sleep(50)
-        time.sleep_ms(50) #yield and debounce a bit
-        self.back() #always go back after click
-        
-    def stop(self):
-        """Our routine (neopixels in this case) is stored in a task.
-        That allows us to cancel it"""
-        try:
-            self.t.cancel()
-        except:
-            pass
-
-# END OF MENU CLASS DEFINITION
-```
-
-
-We can export menugui methods as is.
- We have to wrap normal functions up so they look like a menu object method
-
-```python
-#Export some action functions we are likely to use.
-
-def back(self):
-    self.back()
-
-#basic data function using sort of default values
-#and a closure method of passing parameters
-def data(self):
-    low_v=0
-    high_v=100
-    increment=10
-    caption='plain'
-    field='datafield'
-    print('In data')
-    def wrap():
-        self.get_integer(low_v,high_v,increment, caption,field)
-    return wrap
-    
-#just an example of using the get_integer method with default values
-
-def brightness(self):
-    self.get_integer(low_v=0,high_v=10,increment=10,caption='Brightness(%)',field='brightness')
-
-def wrap(mymenu):
-    "wrap a list into a function so it can be set from within the menu"
-    def mywrap(self):
-        self.set_menu(mymenu)
-    return mywrap
-```
-## Using uasync
-
-I am learning asynchronous programming as I write this menu program.  These notes are based on my current understanding.  I do believe they are alternative facts but nevertheless   may need to be fact checked.  
-
-1. Asynchronous functions run cooperatively and "yield" every so often so other functions can run.
-2. We are not supposed to talk about "yielding" which is similar to but different from yielding in a generator.  Wating and giving some else a go is critical to synchronous programmng.  If we dont really need to wait but just let someone else have a go we can say  "asyncio.sleep(0)". We should say this instead of "yield"
-
-1. Asynchronous programs run within a big loop.  They should set up as   big main function which controls everything else.  We actually run the main function by calling  "asyncio.run(main())" 
-
-3. We can define coroutines anywhere we like.  We make a coroutine by putting async in front of normal funcion defintion.  A corouting usually has an await statement somewhere in it but does not have to.
-A co-routine does not run until we await it. 
-eg await asyncio.sleep(10)
-
-4. We must define tasks within the main function (thus they will go out of scope if our main funtin finishes).  We can await them but we do not have to and they start up immediately without await when we create them.  We can store a task, as we do in the menu class as self.t = asyncio.create_task(fred().  This allows to stop or cancel a task.
-
-Unlike a coroutine we do not have to await a task so it starts immediately.   Thus we can go and make another task or await a co-routine.  The various tasks then  will run concurrently.
-
-4. Writing a cooperative multitasking action task.
-	1. Write a normal function to do something, such as light up some neopixels.
-	2. Put async in front of it to make it a coutine.
-	3. Sprinkle some await async.sleep(0) or other await functions in such a way they get called frequently.  This makes our function (or co-routine) cooperative.
-	4. Now write a menu action function with one parameter called self.
-	5. Inside  this action function, stop previous tasks by calling
-		self.t.cancel()
-		Make a task using our co-routine and call it self.t as below
-		self.t = async.create_task(light_pixels())
-	6. There is  now a proper co-operative co-routine and a proper action function. We can use the action function in our menu definition.
-
-
-```python
-async def rainbow_cycle(self):
-    "Show a rainbow but yield frequently for menus etc"
-    #adapted from pi pico PIO example
-    self.stop()#stop any previous tasks
-    
-    for k in range(255):  #This extra loop makes it run longer
-        for j in range(255):
-            for i in range(NUM_LEDS):
-                rc_index = (i * 256 // NUM_LEDS) + j
-                neopixel.pixels_set(i, wheel(rc_index & 255))
-                await asyncio.sleep(0) #make it play nice with others
-            neopixel.pixels_show()
-            await asyncio.sleep(0) #even nicer
-            
-# now we can put rainbow_cycle (without the brackets) as a menu action
-```
-	
