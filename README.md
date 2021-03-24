@@ -15,8 +15,8 @@ Since some functions can be slow or can block, the menu runs within an asyncio l
 Menus are defined as a list of menu-items. Submenus are really the same as menus.
 A menu item is defined as a pair of values:
 
-	1.  A Caption  (string)
-	2. An action function (a python function with NO parameters)
+1.  A Caption  (string)
+2. An action function (a python function with NO parameters)
 
 Example of a main menu and two submenus called trees and patterns.
 
