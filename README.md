@@ -256,18 +256,6 @@ def my_action_function():
   (Note: This simple system will only handle one task. You can run more tasks,   but you will have to manange them yourself).
 
 
-### Various issues
-
-1. Be careful to define submenus before main parent menus.  If not you will get "variable not defined" errors.
-2. Going back.  The system defines a scroll event for  going up and down the menu structure and a click event that goes forward.  
-   You note that we have no event to go back.  To get around this there is a back function that can be called from a menu item. 
-
-
-
-A menu is like a tree.  We start off on the trunk ("main_menu") and from this sub_menus branch off.  We can also branch off a submenu, so the menu can be arbitarily complex.   When we hit a leaf an action is performed. (Actually we can perform an action at any part of the tree but we will come back to that later.)
-
-We have to write the main_menu last because it will refer to branchs above. In this case our display will show "Patterns" then "Trees" then "Brightness" as we turn the rotary encoder. If we click the "go" button (I use the switch on the shaft that comes with the encoder I used ) a function associated with the menu item will be executed. If we click on "Patterns" the patterns menu we defined in the line above will show.  Similarly for the "tees" menu. However if we click on Brightness we will excute a brightness function.  This allows us to enter an integer value for brightness. (More on this later).
-
 
 
 An alternative would be to provide a back button.  Another alternative is to get some extra events off our simple button (like long-press or double click)  I will show how this can be done later. (The menu uses  uasyncio which  has  a good primitives libary from Peter Hinch that allows us to easily program for long presses or double clicks)
