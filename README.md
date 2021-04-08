@@ -4,9 +4,14 @@
 This is a simple menu system written in micropython.  It uses a switch,  a rotary encoder and an OLED display.  
 It was developed  on a Raspberry Pi Pico but also runs on an ESP32 and ESP8266.
 
-The prototype used a little 128 * 64 pixel SSD1306 based OLED.  It could an be  adapted to other displays using micropython's framebuffer or even  to a very basic like a one-line display like a liquid crystal display.  The rotary encoder I used has a switch on the shaft, which is used as the click button.  The Rotaryirq library for an ESP32 worked perfectly on Raspi Pico and the display used the library SSD1306I2c.py
+The prototype used a little 128 * 64 pixel SSD1306 based OLED.  
+It could an be  adapted to other displays using micropython's framebuffer or even  to a very basic like a one-line display like a liquid crystal display. 
+The rotary encoder I used has a switch on the shaft, which is used as the click button. 
+The Rotaryirq library for an ESP32 worked perfectly on Raspi Pico and the display used the library SSD1306I2c.py
 
-When the Pico is  started the root menu is shown and menuitems are actioned when the switch is clicked.  Any number of subitems can be shown.  Possible menu actions include running a Python funciton, entering an integer by twiddling the encoder and entering a string.
+When the Pico is  started the root menu is shown and menuitems are actioned when the switch is clicked.  
+Any number of subitems can be shown.  
+Possible menu actions include running a Python funciton, entering an integer by twiddling the encoder and entering a string.
 
 Since some functions can be slow or can block, the menu runs within an asyncio loop.
 
@@ -65,7 +70,8 @@ There are three predefined functions to get information:
 
 #### get_integer
 
-This allows us to set a number by twiddling the shaft of the encoder.  The number is entered by clicking the switch.  The result is stored in a global dictionary called data.  The key is set by a field parameter.
+This allows us to set a number by twiddling the shaft of the encoder.  The number is entered by clicking the switch.  
+The result is stored in a global dictionary called data.  The key is set by a field parameter.
 
 ``` python
 sethours   = get_integer(field = 'hour', low_v=1,high_v=24,increment=1,caption='Hours',field='hour')
@@ -84,7 +90,10 @@ The value from the encoder ranges from low to high.  It goes up or down by one e
 
 Sometimes the desired value is a relatively high number, say 0-100 for percentages.
 
-Doing 100 clicks can be tedious if we do not really need that degree of precision so there is an option for the encoder value to be multiplied by Increment when it is  displayed.  In this way,  the display will have  increment of 10 for instance,  we can go from 0 to 100 with 10 clicks.  Note that the stored value is still the raw value.  For instance, with an increment of 10 the display may show 50 but the stored value will be 5.
+Doing 100 clicks can be tedious if we do not really need that degree of precision so there is an option for the encoder value to be multiplied by Increment when it is  displayed.  
+In this way,  the display will have  increment of 10 for instance,  we can go from 0 to 100 with 10 clicks.  
+Note that the stored value is still the raw value. 
+For instance, with an increment of 10 the display may show 50 but the stored value will be 5.
 
 #### get_selection
 
@@ -94,29 +103,37 @@ The selection function lets us get a string value from a list of values. The lis
 colour1 = selection('colour1',['RED',('Green','GREEN'),('Blue','BLUE'),('Yellow','YELLOW'),('WHITE','white')])
 ```
 
-The name displayed is the first value in the tuple and the value returned is the second element of the tuple.  There is an option to just provide a string (say "RED"). In this case the string value is exanded to a tuple ('RED','RED') behind the scenes.
+The name displayed is the first value in the tuple and the value returned is the second element of the tuple.  
+There is an option to just provide a string (say "RED"). In this case the string value is exanded to a tuple ('RED','RED') behind the scenes.
   
 As we turn the shaft the name of the various colours are scrolled, in the same way as a menu.  
 When we click the shaft  value string is stored in the global dictionary and we return to the parent menu.  
 
 **Default values for selection and get_integer**
 
-A selection or get_integer is initialised to the value already in the dictionary,  if a value exists for that field, otherwise the initial value is zero or an empty .  This way we can get a default value by storing values in the dictionary before starting the program and we can revisit the selection to change values.
+A selection or get_integer is initialised to the value already in the dictionary, 
+if a value exists for that field, otherwise the initial value is zero or an empty .  
+This way we can get a default value by storing values in the dictionary before starting the program and we can revisit the selection to change values.
 
 #### Wizard and get_integer
 
-In small microprocessor systems we often want to enter a series of numbers.  For instance we may want to set   hours, minutes and seconds for a clock or day, month year to set the date.  
+In small microprocessor systems we often want to enter a series of numbers.  
+For instance we may want to set   hours, minutes and seconds for a clock or day, month year to set the date.  
 
 The wizard calls a series of functions in sequence, usually get_integer.  A  wizard  is defined similarly to a menu.
 
+``` python
 timewizard = wizard([("Hours",sethours),("Minutes",setminutes),("Seconds",setseconds)])
+```
 
 In this example, the wizard will gather hours, minutes and seconds in that order,   then return.
 The wizard list looks like the menu list but in fact the caption part is ignored ( because a caption has to be provided to get_integer.)
 
  ### The info function.
 
- The info function just displays a screen of text which will be shown when you click its menuitem. Any click or scroll with clear the display (back to the parent menu).   You can provide the text as a simple string but you can also provide a function that returns a string.  This would allow you, for instance, to display the current time. 
+ The info function just displays a screen of text which will be shown when you click its menuitem. 
+ Any click or scroll with clear the display (back to the parent menu).   
+ You can provide the text as a simple string but you can also provide a function that returns a string.  This would allow you, for instance, to display the current time. 
 
 Examples of these alternatives are show below:
 
@@ -128,7 +145,8 @@ showtime = info(my_gettime_function)
 
 ## How to get data out of the system.
 
-An integer or a string  is returned by the functions get_integer and selection.  Both of these functions  have a parameter called field.  The fields is used as the key to store the value in a global dictionary menu_data.
+An integer or a string  is returned by the functions get_integer and selection.  Both of these functions  have a parameter called field.  
+The fields is used as the key to store the value in a global dictionary menu_data.
 
 Since the data dictionary is global it can accessed by other functions.
 
@@ -160,9 +178,12 @@ Display lines of text on the display device.  Up to 4 lines of text are allowed.
 
 ***back()***
 
-Clicking goes forward in a menu and scrolling goes up and down but we need a way to go back.  This is achieved by calling the back function as a menu action. (see menu examples).
+Clicking goes forward in a menu and scrolling goes up and down but we need a way to go back.  
+This is achieved by calling the back function as a menu action. (see menu examples).
 
-If we had a way to provide more events than simple clicking and scrolling we could use one of these events to go back.  Possible sources for such an event would be another button or using long push or double click on a single button.  While easy to implement, this has not been done since the current system seems quite intuitive.
+If we had a way to provide more events than simple clicking and scrolling we could use one of these events to go back.  
+Possible sources for such an event would be another button or using long push or double click on a single button.  
+While easy to implement, this has not been done since the current system seems quite intuitive.
 
 ***make_task(coroutine)***
 
@@ -216,7 +237,8 @@ def wrap_show_pixels():
 
 **Writing a co-routine or multiasking.**
 
-A long running action on your microprocessor could block the menu system.  To avoid this the menu system supports co-operative multitasking using uasyncio.
+A long running action on your microprocessor could block the menu system.  
+To avoid this the menu system supports co-operative multitasking using uasyncio.
 
 There are several tutorials about multitasking with asyncio. Peter Hinchs tutorial is a particularly good one but gets moderately advanced. https://github.com/peterhinch/micropython-async/blob/master/v3/docs/TUTORIAL.md 
 
