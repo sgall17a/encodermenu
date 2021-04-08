@@ -1,21 +1,35 @@
 # Micropython encoder based menu
 
 
-This is a simple menu system written in micropython.  It uses a switch,  a rotary encoder and an OLED display.  It was developed  on a Raspberry Pi Pico but also runs on an ESP32 and ESP8266.
+This is a simple menu system written in micropython.  It uses a switch,  a rotary encoder and an OLED display.  
+It was developed  on a Raspberry Pi Pico but also runs on an ESP32 and ESP8266.
 
-The prototype used a little 128 * 64 pixel SSD1306 based OLED.  It could an be  adapted to other displays using micropython's framebuffer or even  to a very basic like a one-line display like a liquid crystal display.  The rotary encoder I used has a switch on the shaft, which is used as the click button.  The Rotaryirq esp32 library worked perfectly on Raspi Pico and the display used the library SSD1306IRQ.py
+The prototype used a little 128 * 64 pixel SSD1306 based OLED.  It could an be  adapted to other displays using micropython's framebuffer or even  to a very basic like a one-line display like a liquid crystal display.  The rotary encoder I used has a switch on the shaft, which is used as the click button.  The Rotaryirq library for an ESP32 worked perfectly on Raspi Pico and the display used the library SSD1306I2c.py
 
 When the Pico is  started the root menu is shown and menuitems are actioned when the switch is clicked.  Any number of subitems can be shown.  Possible menu actions include running a Python funciton, entering an integer by twiddling the encoder and entering a string.
 
 Since some functions can be slow or can block, the menu runs within an asyncio loop.
 
+## Libraries
+For rotary encoder.
+https://github.com/miketeachman/micropython-rotary
+
+For OLED display:
+https://github.com/micropython/micropython/blob/master/drivers/display/ssd1306.py
+
+Any display driver that depends on the module framebuf should work out of the box.
+It would be simple to adapt the display function for a single or two line dislay like an LCD.
+
+I have written my library with a minimal  "hardware abstration layer" in case you want to use other libraries.
+
+#### WARNING - STILL BEING DEVELOPED.  Some of the information below may not immediately match the actual library code.
 
 ## Defining menus and Submenus
 
 Menus are defined as a list of menu-items. Submenus are really the same as menus.
-A menu item is defined as a pair of values:
+Each menu item is defined as a pair of values:
 
-1.  A Caption  (string)
+1. A Caption  (string)
 2. An action function (a python function with NO parameters)
 
 Example of a main menu and two submenus called trees and patterns.
@@ -35,11 +49,11 @@ Here we have defined three menus, 'trees', 'patterns' and 'main_menu'.
 
 Note that the menu caption needs quotes (because it is a string), but the function does not because it is just the name of a function.
 
-To transform our list into a function we pass it to another function called 'wrap_menu'.  Since our menu becomes a function,  it can be the function that is called from a menuitem.  In this way we can get sub-menus.
+To transform our list into a function we pass it to another function called 'wrap_menu'.  
+Note that  our wrapped menu becomes a function,  so it can be the function that is called from a menuitem.  In this way we get sub-menus.
 
-Menu function must be defined before they are used.  The root menu should be the last to be defined.
-
-
+Menu functions must be defined before they are used.  The root menu should be the last to be defined.
+(Later versions may address this by allowing an action function to be defined as a string which is turned into a function on a second pass).
 
 ### Functions to get information
 
@@ -66,21 +80,22 @@ if data['hour'] = 10:
 
 ```
 
-The value from the encoder ranges from low to high.  It goes up or down by one each time we turn the encoder by one click. Sometimes the desired value is a relatively high number, say 0-100 for percentages.
+The value from the encoder ranges from low to high.  It goes up or down by one each time we turn the encoder by one click. 
 
-Doing 100 clicks is tedious if we do not really need that degree of precision. The encoder value is multiplied by Increment when it is stored or displayed.  In this way,  with an increment of 10 for instance,  we can go from 0 to 100 with 10 clicks.
+Sometimes the desired value is a relatively high number, say 0-100 for percentages.
+
+Doing 100 clicks can be tedious if we do not really need that degree of precision so there is an option for the encoder value to be multiplied by Increment when it is  displayed.  In this way,  the display will have  increment of 10 for instance,  we can go from 0 to 100 with 10 clicks.  Note that the stored value is still the raw value.  For instance, with an increment of 10 the display may show 50 but the stored value will be 5.
 
 #### get_selection
 
-The selection function lets us get a string value from a list of values. The list is similar to a menu's list but  also has a field parameter.
+The selection function lets us get a string value from a list of values. The list is similar to a menu's list but  also has a field parameter so it can be retrieved from the global menu_data dictionary.
 
 ```python 
 colour1 = selection('colour1',['RED',('Green','GREEN'),('Blue','BLUE'),('Yellow','YELLOW'),('WHITE','white')])
 ```
 
-The name displayed is the first value in the tuple and the value returned is the second element of the tuple.  There is an option to just provide a string (say "RED"). 
-In this case the string value is exanded to a tuple ('RED','RED') behind the scenes.
-
+The name displayed is the first value in the tuple and the value returned is the second element of the tuple.  There is an option to just provide a string (say "RED"). In this case the string value is exanded to a tuple ('RED','RED') behind the scenes.
+  
 As we turn the shaft the name of the various colours are scrolled, in the same way as a menu.  
 When we click the shaft  value string is stored in the global dictionary and we return to the parent menu.  
 
@@ -96,8 +111,8 @@ The wizard calls a series of functions in sequence, usually get_integer.  A  wiz
 
 timewizard = wizard([("Hours",sethours),("Minutes",setminutes),("Seconds",setseconds)])
 
-This wizard will gather hours, minutes and seconds in that order,   then return.
-The list looks like the list used to define a menu but in fact the caption is ignored ( because a caption is provided to get_integer.)
+In this example, the wizard will gather hours, minutes and seconds in that order,   then return.
+The wizard list looks like the menu list but in fact the caption part is ignored ( because a caption has to be provided to get_integer.)
 
  ### The info function.
 
@@ -111,17 +126,15 @@ showtime = info(my_gettime_function)
 # don't use brackets on the function name
 ```
 
- ##  
-
 ## How to get data out of the system.
 
-An integer or a string  is returned by the functions get_integer and selection.  Both of these functions  have a parameter called field.  The fields is used as the key to store the value in a global dictionary.
+An integer or a string  is returned by the functions get_integer and selection.  Both of these functions  have a parameter called field.  The fields is used as the key to store the value in a global dictionary menu_data.
 
 Since the data dictionary is global it can accessed by other functions.
 
 ### Hardware abstraction functions
 
-These functions are provided  as a form of hardware abstraction in case you wnat to us different libraries from  SSD1306_i2c,  rotary-irq library.
+These functions are provided  as a form of hardware abstraction in case you want to use different libraries from  SSD1306_i2c and  rotary-irq library (which I think is probably unlikely)
 
 **set_encoder(minimum_value, maximum_value,increment)**
 
@@ -203,23 +216,21 @@ def wrap_show_pixels():
 
 **Writing a co-routine or multiasking.**
 
-There are several tutorials about multitasking with asyncio. Peter Hinchs tutorial is a particularly good one but gets moderately advanced.
+A long running action on your microprocessor could block the menu system.  To avoid this the menu system supports co-operative multitasking using uasyncio.
 
-Action functions that run for a long time like endless loops should be written as co-routines otherwise they will block and stop the menu working.
+There are several tutorials about multitasking with asyncio. Peter Hinchs tutorial is a particularly good one but gets moderately advanced. https://github.com/peterhinch/micropython-async/blob/master/v3/docs/TUTORIAL.md 
 
-However, if the function takes a long time to run it will block and the menu system will freeze.
-We can get around blocking by writing an async function.  
 
-I will assume that a  program is long running because it  has a loop, which is usually the case.
 
-**The steps to turn a function  into a co-routine and then a task: **
+**HOW TO TURN A FUNCTION INTO A CO-ROUTINE AND THEN A TASK **
+I will assume that our  program is long running because it  has a loop. This is  usually the case.
 
 1. Import uasyncio as asyncio to make the async functions available.
 
-1. put async before def
-2. Put "await asyncio.sleep(0)" into the loop so it is called frequently.  This makes our function play nicely with others, including the main menu.
-3. Turn the co-routine into a task.  This also starts it running. We dont have to await it. Make_task(co-routine ) is provided as a utility.
-4. cancel the task when we want our loop to stop. Stop() s is provided as a utility.
+1. put async before the def part of the function.
+2. Put "await asyncio.sleep(0)" somewhere in the loop so it is called frequently.  This makes our function play nicely with others, including the main menu.
+3. Turn the co-routine into a task.  This also starts it running, so we dont have to await it. Make_task(co-routine ) is provided as a utility.
+4. cancel the task when we want our loop to stop. Stop() is provided as a utility.
 
 Example:
 
@@ -227,16 +238,18 @@ Example:
 import uasyncio as aysncio
 from encodermenu import make_task, stop
 
-# Define this in the body of the program (or locally in the action function if you want)
-async def loopy_function():
+# Define this function in the body of the program or (better) locally in an imported action module.
+# This is the function that actually does the work.
+
+async def worker_loopy_function(): #This makes it a co-routine
     do_something()
-    await asyncio.sleep(0)
+    await asyncio.sleep(0)  #This makes it play nicely with others (including our menu)
     
 #In our action function
 def my_action_function():
   stop() # stop any previously running tasks 
-  make_task(loopy_function) # this will make a task and run it
-  #note there are no brackets on our loopy_function
+  make_task(worker_loopy_function) # this will make a task and run it
+  #note there are no brackets on our worker_loopy_function
 
 ```
 
@@ -253,16 +266,18 @@ def my_action_function():
   Any function called within the menu system is also running within the asyncio loop so it can be a task or routine.
 * A convenience function  make_task  stores the task in a global variable called task.
 * A  convenience function called stop can cancels  the running task.
-  (Note: This simple system will only handle one task. You can run more tasks,   but you will have to manange them yourself).
+  (Note: This simple system will only handle one task. You can run more tasks, but you will have to manange them yourself).
 
+## Going back up the menu.
+You may have noticed that we can go down our menu tree but we cant go back.
+To get around this a back() function has been provided which is called like any other menu-item action.
+An alternative would be to provide a back button for a separate event.  Another alternative would be to get some extra events off our single button (like long-press or double click)  
 
-
-
-An alternative would be to provide a back button.  Another alternative is to get some extra events off our simple button (like long-press or double click)  I will show how this can be done later. (The menu uses  uasyncio which  has  a good primitives libary from Peter Hinch that allows us to easily program for long presses or double clicks)
+The menu uses  uasyncio which  has  a good primitives libary from Peter Hinch that allows us to easily program for long presses or double clicks. I may have a look at this later but I think the current system works pretty well.
 
 ### Writing a menu (menus are functions and actions are functions)
 
-We note that a menuitem is defined as tuple composed of a string menu item caption and an action that is performed if the menu is clicked, like so ('Caption1', action1).  A menu is a list of menu-items.  (Note - we could use either lists or tuples - it does not really matter).  
+We note that a menuitem is defined as tuple composed of a string menu item caption and an action that is performed if the menu is clicked, like so ('Caption1', action1).  A menu is a list of menu-items.  (Note - we could use either lists or tuples  or some other iterative - it does not really matter-but lists and tuples look nice).  
 
 After we have provided a list of menu-items we have to wrap the list up into a function and we do this by using the wrap function.  This means that both actions and submenus are handled the same way in our system.  A submenu is simply an action that installs a new menu.
 
